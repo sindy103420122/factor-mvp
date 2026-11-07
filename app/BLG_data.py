@@ -1,46 +1,22 @@
 import pandas as pd
 import numpy as np
 
-def prepare_fundamentals(fundamentals):
+def get_mock_data(date: str) -> pd.DataFrame:
     """
-    處理季頻財報資料，計算 US-332 (TTM EPS) 與 US-578 (毛利率 YoY)
+    獲取指定日期的台股假資料 (Mock Data)，供 MVP 測試與回測管線使用。
+    模擬已解決 Point-in-Time (無前視偏誤) 的當日可用資訊。
     """
-    df = fundamentals.copy()
-    df["period_end"] = pd.to_datetime(df["period_end"])
-    df["published_at"] = pd.to_datetime(df["published_at"])
-
-    # 確保資料依據公司與財報截止日排序，並去重
-    df = df.drop_duplicates(subset=["ticker", "period_end"], keep="last")
-    df = df.sort_values(["ticker", "period_end"])
-
-    # US-578: 單季毛利率年變動 (取得去年同季資料)
-    df["gross_margin_prev_year"] = df.groupby("ticker")["gross_margin"].shift(4)
-    df["gross_margin_yoy_diff"] = df["gross_margin"] - df["gross_margin_prev_year"]
-
-    # US-332: 近四季 EPS 滾動加總 (Trailing Twelve Months)
-    # min_periods=4 確保新上市未滿一年的公司不會算出錯誤的 TTM
-    df["eps_ttm"] = df.groupby("ticker")["eps"].transform(
-        lambda x: x.rolling(window=4, min_periods=4).sum()
-    )
-
-    return df
-
-def merge_point_in_time(left, right, date_col="published_at", suffix=""):
-    """時點對齊合併，嚴格防範前視偏誤 (Look-ahead Bias)"""
-    left = left.dropna(subset=["date", "ticker"]).sort_values(["date", "ticker"])
-    right = right.dropna(subset=[date_col, "ticker"]).sort_values([date_col, "ticker"])
-    right = right.drop_duplicates(subset=[date_col, "ticker"], keep="last")
-
-    result = pd.merge_asof(
-        left, right,
-        left_on="date", right_on=date_col,
-        by="ticker", direction="backward",
-        allow_exact_matches=True, suffixes=("", suffix)
-    )
-    
-    # 前視偏誤防呆檢查
-    check_col = f"{date_col}{suffix}" if f"{date_col}{suffix}" in result.columns else date_col
-    if (result[check_col].notna() & (result[check_col] > result["date"])).any():
-        raise ValueError("致命錯誤：檢測到前視偏誤 (Look-ahead bias)！")
-
-    return result
+    data = {
+        'ticker': ['1101', '2330', '2317', '2603', '0000'],
+        # US-332 需用資料
+        'close_price': [50.0, 100.0, 150.0, 60.0, 10.0],
+        'ttm_eps': [-1.5, 5.0, 10.0, 3.0, 1.0],
+        'payout_ratio': [0.8, 0.8, 0.5, 0.0, 0.5],
+        # US-496 需用資料
+        'inst_buy_5d': [0, 5000, 2000, 0, np.nan], 
+        'total_shares': [200000, 500000, 1000000, 100000, 50000],
+        # US-578 需用資料
+        'margin_now': [15.0, 25.0, 10.0, 30.0, 15.0],
+        'margin_last': [np.nan, 20.0, 8.0, 40.0, 10.0]
+    }
+    return pd.DataFrame(data).set_index('ticker')

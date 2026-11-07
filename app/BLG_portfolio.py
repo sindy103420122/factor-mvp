@@ -1,74 +1,30 @@
-import numpy as np
 import pandas as pd
 
-def get_rebalance_dates(df):
-    """取得資料集內每個月最後一個交易日"""
-    dates = pd.to_datetime(df["date"]).drop_duplicates().sort_values()
-    return dates.groupby(dates.dt.to_period("M")).max().tolist()
-
-def build_portfolio(df, top_n=20, min_score=None):
+def calculate_z_scores(signals: pd.DataFrame) -> pd.DataFrame:
     """
-    智慧選股投資組合 (Smart Beta)：月調倉，依合成分數選 Top N，等權重配置
+    將所有因子進行 Z-score 標準化。
+    對於缺值 (NaN)，採用中位數填補，以確保不會因單一因子缺漏而整筆失效。
     """
-    df = df.copy()
-    df["date"] = pd.to_datetime(df["date"])
+    filled_signals = signals.fillna(signals.median())
+    # Z-score 公式：(X - Mean) / Std
+    return (filled_signals - filled_signals.mean()) / filled_signals.std(ddof=0)
 
-    # 1. 批次篩選出所有調倉日且訊號非 NaN 的資料
-    rebalance_dates = get_rebalance_dates(df)
-    reb_df = df[df["date"].isin(rebalance_dates)].dropna(subset=["signal_score"])
-
-    # 2. 分數門檻過濾
-    if min_score is not None:
-        reb_df = reb_df[reb_df["signal_score"] >= min_score]
-
-    # 3. 向量化選股：依日期與分數排序後，取每期前 top_n 檔
-    portfolio = (
-        reb_df.sort_values(["date", "signal_score"], ascending=[True, False])
-        .groupby("date", as_index=False)
-        .head(top_n)
-        .copy()
-    )
-
-    # 若全無選出標的，回傳安全的空 DataFrame
-    if portfolio.empty:
-        return pd.DataFrame(columns=["rebalance_date", "date", "ticker", "signal_score", "weight"])
-
-    # 4. 計算等權重（依每期實際入選檔數平分 1.0）
-    portfolio["weight"] = 1.0 / portfolio.groupby("date")["ticker"].transform("count")
-    portfolio["rebalance_date"] = portfolio["date"]
-
-    valid_cols = [c for c in ["rebalance_date", "date", "ticker", "signal_score", "close", "weight"] if c in portfolio.columns]
-    return portfolio[valid_cols].reset_index(drop=True)
-
-def build_baseline_portfolio(df):
+def generate_weights(signals: pd.DataFrame, top_n: int = 2) -> pd.Series:
     """
-    基準對照組 (Baseline)：月調倉，全市場等權重，作為計算 Alpha 比較用
+    將因子訊號轉化為投資組合權重。
+    使用 Z-score 等權重相加，選出總分最高的前 N 檔股票「等權重買進」。
     """
-    df = df.copy()
-    df["date"] = pd.to_datetime(df["date"])
-
-    rebalance_dates = get_rebalance_dates(df)
-    reb_df = df[df["date"].isin(rebalance_dates)].copy()
+    # 1. 取得 Z-score
+    z_scores = calculate_z_scores(signals)
     
-    if reb_df.empty:
-        return pd.DataFrame()
-
-    # 全市場等權重
-    reb_df["weight"] = 1.0 / reb_df.groupby("date")["ticker"].transform("count")
-    reb_df["rebalance_date"] = reb_df["date"]
-
-    valid_cols = [c for c in ["rebalance_date", "date", "ticker", "close", "weight"] if c in reb_df.columns]
-    return reb_df[valid_cols].reset_index(drop=True)
-
-def get_target_weights(portfolio):
-    """將投資組合明細轉為目標權重矩陣 (Rebalance Date x Ticker)"""
-    if portfolio.empty:
-        return pd.DataFrame()
-
-    return portfolio.pivot_table(
-        index="rebalance_date",
-        columns="ticker",
-        values="weight",
-        aggfunc="sum",
-        fill_value=0.0
-    ).sort_index()
+    # 2. 多因子等權重相加 (US-332 + US-496 + US-578)
+    total_score = z_scores.sum(axis=1)
+    
+    # 3. 挑選總分最高的前 N 檔股票 (MVP 預設挑 2 檔)
+    top_stocks = total_score.nlargest(top_n).index
+    
+    # 4. 分配資金權重
+    weights = pd.Series(0.0, index=signals.index)
+    weights[top_stocks] = 1.0 / top_n # 等權重分配 (例如 2 檔就是各 50%)
+    
+    return weights

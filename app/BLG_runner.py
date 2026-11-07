@@ -1,59 +1,40 @@
-import os
 import pandas as pd
-import numpy as np
-
-# 匯入管線中的各個模組
-from app.data import prepare_fundamentals, merge_point_in_time
-from app.factors import build_factors
-from app.signals import generate_signals
-from app.portfolio import build_portfolio
-from app.backtest import BacktestEngine, calculate_performance
+from data import get_mock_data
+from factors import generate_alpha_signals
+from portfolio import generate_weights
+from backtest import run_single_period_backtest
 
 def run_pipeline():
-    print("🚀 [1/5] 載入資料與時點對齊 (Point-in-Time)...")
-    # 實務上這裡會讀取你的 CSV 檔案
-    # prices = pd.read_csv("data/prices.csv", parse_dates=["date"])
-    # fundamentals = pd.read_csv("data/fundamentals.csv", parse_dates=["period_end", "published_at"])
-    # df = prepare_fundamentals(fundamentals)
-    # df = merge_point_in_time(prices, df)
+    print("🚀 [1/4] 啟動台股因子回測管線...")
     
-    # 這裡建立一個簡單的假資料 DataFrame 確保程式能空轉測試
-    dates = pd.date_range("2023-01-01", "2026-09-30", freq="B")
-    df = pd.DataFrame({"date": dates, "ticker": "2330", "close": 500, "eps_ttm": 30, "dividend_rate": 0.5, "trust_net_buy": 100, "shares_outstanding": 25930000, "gross_margin_yoy_diff": 0.02})
+    # 1. Data: 取得計算日資料
+    print("📊 [2/4] 載入 Point-in-Time 截面資料...")
+    df = get_mock_data(date="2026-11-05")
     
-    print("📊 [2/5] 計算因子與橫斷面 Z-score...")
-    df = build_factors(df)
-
-    print("🎯 [3/5] 生成多因子合成分數與股票排名...")
-    # 預設呼叫 generate_signals，將缺值補 0 並產生 signal_score
-    df = generate_signals(df)
-
-    print("💼 [4/5] 建構月調倉等權重投資組合...")
-    # 每月底選出 Top 20 檔股票，等權重配置
-    portfolio = build_portfolio(df, top_n=20)
-
-    print("📈 [5/5] 執行歷史回測與交易成本核算...")
-    # 扣除買賣手續費 0.1425% 與證交稅 0.3%
-    engine = BacktestEngine(initial_capital=1_000_000)
+    # 2. Factors: 計算因子與訊號
+    print("🧮 [3/4] 計算 US-332, US-496, US-578 因子特徵...")
+    signals = generate_alpha_signals(df)
     
-    # 若 portfolio 有內容則執行回測，否則略過避免報錯
-    if not portfolio.empty:
-        backtest_result = engine.run(df, portfolio)
-        stats = calculate_performance(backtest_result)
-        
-        print("\n" + "=" * 40)
-        print("🏆 【台股智慧因子策略 - 樣本外績效報告】")
-        print("=" * 40)
-        for k, v in stats.items():
-            if "Return" in k or "Volatility" in k or "Drawdown" in k:
-                print(f" - {k:<18}: {v:>8.2%}")
-            else:
-                print(f" - {k:<18}: {v:>8.2f}")
-        print("=" * 40 + "\n")
-        return backtest_result, stats
-    else:
-        print("\n⚠️ 警告：股票池過濾後無標的，無法產生回測結果。")
-        return None, None
+    # 3. Portfolio: 計算 Z-score 並分配權重
+    print("⚖️  [4/4] 計算 Z-score 並產出投資組合權重...")
+    weights = generate_weights(signals, top_n=2)
+    
+    # 4. Backtest: 模擬次期報酬 (這裡用假資料模擬次期收盤價)
+    prices_now = df['close_price']
+    prices_next = prices_now * 1.05 # 模擬全面上漲 5% 作為驗證
+    
+    bt_result = run_single_period_backtest(weights, prices_now, prices_next)
+    
+    # 5. Report: 產出報告
+    print("\n" + "="*40)
+    print("📈 MVP 回測績效報告 (單期)")
+    print("="*40)
+    print(f"投資組合權重配置:\n{weights[weights > 0]}")
+    print("-" * 40)
+    print(f"原始總報酬 (Gross Return): {bt_result['gross_return']:.4%}")
+    print(f"交易成本估算 (Trade Cost):   {bt_result['cost']:.4%}")
+    print(f"單期淨報酬 (Net Return):   {bt_result['net_return']:.4%}")
+    print("="*40)
 
 if __name__ == "__main__":
     run_pipeline()

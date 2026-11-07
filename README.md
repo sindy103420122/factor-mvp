@@ -147,9 +147,9 @@ python src/create_report.py
 ## 組員分工
 
 | 姓名 | 負責任務 |
-| 陳心怡 |---|
+| 陳心怡 |專案進度與 GitHub Repo 管理、整合各組員成果、審查 Pull Request|
 | 陳哲諺 | 協助需求文件整理與測試 |
 | 鄭稟哲 | 需求整理與功能規劃 |
 | 陳楓和 | MVP 主系統管線、Gherkin 測試、ADR、FinMind 資料來源 |
 | 王士哲 | 檢查錯誤 |
-| 李承祐 | （待補） |
+| 李承祐 | README 與使用說明整理、成果簡報 |

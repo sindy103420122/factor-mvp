@@ -1,0 +1,104 @@
+{
+  "methods": {
+    "baseline": {
+      "factor_weights": "equal",
+      "top_n": 5
+    },
+    "smart": {
+      "factor_weights": "trailing nonnegative mean rank IC; min 12 obs; max 36 obs",
+      "top_n": 5
+    }
+  },
+  "cost_assumptions_bps": {
+    "commission_each_side": 14.25,
+    "sell_tax": 30.0,
+    "slippage_each_side": 10.0
+  },
+  "results": {
+    "baseline": {
+      "development": {
+        "strategy": {
+          "months": 84,
+          "total_return": 1.103598084943103,
+          "cagr": 0.11208386091882039,
+          "volatility": 0.17395582061155218,
+          "sharpe_rf0": 0.6969128511479852,
+          "max_drawdown": -0.26358217585829324,
+          "avg_one_way_turnover": 0.23712418516305184
+        },
+        "benchmark": {
+          "months": 84,
+          "total_return": 1.2266620904202674,
+          "cagr": 0.12115304857372733,
+          "volatility": 0.161026534490415,
+          "sharpe_rf0": 0.793416172532287,
+          "max_drawdown": -0.2563249080550447,
+          "avg_one_way_turnover": null
+        }
+      },
+      "out_of_sample": {
+        "strategy": {
+          "months": 45,
+          "total_return": 3.3769761205482567,
+          "cagr": 0.4824490653143345,
+          "volatility": 0.33164944309619715,
+          "sharpe_rf0": 1.3507170915178575,
+          "max_drawdown": -0.17656191216633743,
+          "avg_one_way_turnover": 0.2578342327709677
+        },
+        "benchmark": {
+          "months": 45,
+          "total_return": 2.7720039606925115,
+          "cagr": 0.4247956177285792,
+          "volatility": 0.20807170706234587,
+          "sharpe_rf0": 1.8244044815514575,
+          "max_drawdown": -0.13767407043728852,
+          "avg_one_way_turnover": null
+        }
+      }
+    },
+    "smart": {
+      "development": {
+        "strategy": {
+          "months": 84,
+          "total_return": 0.294017852013567,
+          "cagr": 0.03750803029833949,
+          "volatility": 0.13600937449273737,
+          "sharpe_rf0": 0.33834402524788687,
+          "max_drawdown": -0.3019554296172908,
+          "avg_one_way_turnover": 0.21576612119011665
+        },
+        "benchmark": {
+          "months": 84,
+          "total_return": 1.2266620904202674,
+          "cagr": 0.12115304857372733,
+          "volatility": 0.161026534490415,
+          "sharpe_rf0": 0.793416172532287,
+          "max_drawdown": -0.2563249080550447,
+          "avg_one_way_turnover": null
+        }
+      },
+      "out_of_sample": {
+        "strategy": {
+          "months": 45,
+          "total_return": 3.060898042887662,
+          "cagr": 0.4531124470915582,
+          "volatility": 0.3346017126963368,
+          "sharpe_rf0": 1.283385762316663,
+          "max_drawdown": -0.17525982487051972,
+          "avg_one_way_turnover": 0.19822966008595447
+        },
+        "benchmark": {
+          "months": 45,
+          "total_return": 2.7720039606925115,
+          "cagr": 0.4247956177285792,
+          "volatility": 0.20807170706234587,
+          "sharpe_rf0": 1.8244044815514575,
+          "max_drawdown": -0.13767407043728852,
+          "avg_one_way_turnover": null
+        }
+      }
+    }
+  },
+  "caveat": "Exploratory 12-current-large-cap sample; not a point-in-time full-market result."
+}

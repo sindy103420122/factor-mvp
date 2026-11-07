@@ -3,6 +3,7 @@
 用法：
   python -m app.runner --demo                    # 用假資料跑（任何電腦都能跑）
   python -m app.runner --data data/processed     # 用轉好的 TEJ 資料跑
+  python -m app.runner --demo --config configs/jojo-panda.json   # 用個人設定檔
 """
 import argparse
 from pathlib import Path
@@ -10,7 +11,7 @@ from pathlib import Path
 import pandas as pd
 
 from app.backtest import run_backtest
-from app.config import Settings, check_period
+from app.config import Settings, check_period, describe, load_settings
 from app.data import load_processed
 from app.factors import momentum_12_1, revenue_yoy
 from app.portfolio import combine_scores, select_top_n
@@ -38,9 +39,12 @@ def main(argv=None):
     ap.add_argument("--data", default="data/processed", help="標準化資料夾")
     ap.add_argument("--demo", action="store_true", help="先產生假資料到 data/demo 再執行")
     ap.add_argument("--out", default="output", help="輸出資料夾")
+    ap.add_argument("--config", default=None, help="個人設定檔，例如 configs/jojo-panda.json")
     args = ap.parse_args(argv)
 
-    settings = Settings()
+    settings = load_settings(args.config)
+    print(f"使用設定：{args.config or '預設值（app/config.py）'}")
+    print(describe(settings))
     check_period(settings.end, settings)   # 樣本外鎖
 
     folder = args.data

@@ -1,0 +1,11 @@
+{
+  "_說明": "jojo-panda 的個人設定。只寫要改的參數，沒寫的用 app/config.py 的預設值。決定理由寫在 docs/DECISIONS_jojo-panda.md。",
+
+  "min_avg_value": 20000000,
+  "top_n": 30,
+  "cost": {
+    "fee_rate": 0.001425,
+    "tax_rate": 0.003,
+    "slippage": 0.001
+  }
+}

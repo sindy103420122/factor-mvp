@@ -31,6 +31,52 @@ class Settings:
     cost: CostConfig = field(default_factory=CostConfig)
 
 
+def load_settings(path: str = None) -> Settings:
+    """讀取個人設定檔（JSON），只覆蓋檔案裡有寫的參數，其餘用預設值。
+
+    個人設定檔放在 configs/，例如 configs/jojo-panda.json。
+    寫錯參數名稱會直接報錯，避免打錯字卻默默用了預設值。
+    """
+    import json
+    from dataclasses import fields
+
+    settings = Settings()
+    if path is None:
+        return settings
+    with open(path, encoding="utf-8") as f:
+        raw = json.load(f)
+    raw = {k: v for k, v in raw.items() if not k.startswith("_")}   # _ 開頭的欄位是註解
+
+    cost_raw = raw.pop("cost", {})
+    valid = {f.name for f in fields(Settings)} - {"cost"}
+    unknown = set(raw) - valid
+    if unknown:
+        raise KeyError(f"設定檔 {path} 有不認得的參數：{sorted(unknown)}。可用的參數：{sorted(valid)}")
+    for k, v in raw.items():
+        setattr(settings, k, tuple(v) if k == "factors" else v)
+
+    cost_valid = {f.name for f in fields(CostConfig)}
+    unknown = set(k for k in cost_raw if not k.startswith("_")) - cost_valid
+    if unknown:
+        raise KeyError(f"設定檔 {path} 的 cost 有不認得的參數：{sorted(unknown)}。可用的參數：{sorted(cost_valid)}")
+    for k, v in cost_raw.items():
+        if not k.startswith("_"):
+            setattr(settings.cost, k, v)
+    return settings
+
+
+def describe(settings: Settings) -> str:
+    """把目前使用的參數印出來，方便確認與截圖。"""
+    c = settings.cost
+    return "\n".join([
+        f"期間：{settings.start} ~ {settings.end}（樣本外鎖：{'已解鎖' if settings.unlock_oos else '鎖住'}）",
+        f"流動性門檻：過去 {settings.liquidity_lookback} 日平均成交金額 {settings.min_avg_value:,.0f} 元",
+        f"持股：前 {settings.top_n} 檔等權",
+        f"因子權重：{settings.factor_weights}",
+        f"成本：手續費 {c.fee_rate:.4%}、證交稅 {c.tax_rate:.2%}、滑價 {c.slippage:.2%}",
+    ])
+
+
 class OutOfSampleLockedError(RuntimeError):
     """樣本外期間尚未解鎖時拋出。"""
 

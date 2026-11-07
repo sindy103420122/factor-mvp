@@ -72,4 +72,4 @@ python app/runner.py
 ---
 
 ## 👥 AI 協作聲明
-本專案開發過程參考 `ai_log/AI IAA.md` 紀錄，透過與 AI 協同規劃架構、除錯（如解決 `ModuleNotFoundError` 與路徑相依問題）與圖表擴充，實現高效且高品質的交付物產出。
+本專案開發過程參考 `ai_log/AI_Log` 紀錄，透過與 AI 協同規劃架構、除錯（如解決 `ModuleNotFoundError` 與路徑相依問題）與圖表擴充，實現高效且高品質的交付物產出。

@@ -1,124 +1,130 @@
 from behave import given, when, then
+import pandas as pd
+import numpy as np
 import math
+import sys
+import os
+
+# 將 app 目錄加入路徑以利匯入模組
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+from app.factors import calc_dividend_yield, calc_institutional_buy_ratio, calc_gross_margin_yoy
 
 # ==========================================
 # US-332 預估高股息殖利率因子
 # ==========================================
-@given('某檔股票的 TTM EPS 為 {eps:f} 且預估配息率為 {payout:f}')
-def step_impl(context, eps, payout):
-    context.eps = eps
+@given('某檔股票的 TTM EPS 為 {eps:f}')
+def step_impl(context, eps):
+    context.ttm_eps = eps
+
+@given('預估配息率固定為 {payout:f}')
+def step_impl(context, payout):
     context.payout = payout
 
-@given('最新收盤價為 {price:f}')
+@given('計算日當天的最新收盤價為 {price:f}')
 def step_impl(context, price):
     context.price = price
 
 @when('系統計算預估殖利率')
 def step_impl(context):
-    if getattr(context, 'eps', 0) <= 0:
-        context.yield_result = 0.0
-    else:
-        context.yield_result = (context.eps * context.payout) / context.price
+    df = pd.DataFrame({
+        'ttm_eps': [context.ttm_eps],
+        'payout_ratio': [context.payout],
+        'close_price': [context.price]
+    })
+    context.result = calc_dividend_yield(df).iloc[0]
 
-@then('結果應為 {expected:f}')
+@then('預估殖利率結果應為 {expected:f}')
 def step_impl(context, expected):
-    assert abs(context.yield_result - expected) < 1e-4, f"預期 {expected}, 實際為 {context.yield_result}"
+    assert abs(context.result - expected) < 1e-4, f"預期 {expected}, 實際為 {context.result}"
 
-@given('某檔股票的 TTM EPS 為 {eps:f}')
-def step_impl(context, eps):
-    context.eps = eps
-    context.price = 100 # Mock price
-    context.payout = 0.8
-
-@then('結果應直接標記為 0 淘汰')
+@then('預估殖利率結果應直接標記為 0.0')
 def step_impl(context):
-    assert context.yield_result == 0.0, "EPS為負，殖利率應為0"
-
+    assert context.result == 0.0, "條件不符，應直接淘汰(給予0.0)"
 
 # ==========================================
 # US-496 投信買超佔股本比因子
 # ==========================================
-@given('系統正處於交易日 t')
-def step_impl(context):
-    context.current_day = "t"
+@given('某檔股票在過去 5 個交易日投信累計買超 {vol:f} 張')
+def step_impl(context, vol):
+    context.inst_buy_5d = vol
 
-@when('請求投信買超數據時')
-def step_impl(context):
-    context.requested_data = "t-1_data"
-
-@then('系統必須只回傳 t-1 日(含)以前的盤後數據')
-def step_impl(context):
-    assert context.requested_data == "t-1_data", "必須防前視偏誤"
-
-@given('過去 5 日投信累計買超 {buy_vol:d} 張')
-def step_impl(context, buy_vol):
-    context.buy_vol = buy_vol
-
-@given('該公司發行總張數為 {total_shares:d} 張')
-def step_impl(context, total_shares):
-    context.total_shares = total_shares
+@given('計算日的發行總張數為 {shares:f} 張')
+def step_impl(context, shares):
+    context.total_shares = shares
 
 @when('系統計算投信買超佔比')
 def step_impl(context):
-    context.ratio = context.buy_vol / context.total_shares
+    df = pd.DataFrame({
+        'inst_buy_5d': [context.inst_buy_5d],
+        'total_shares': [context.total_shares]
+    })
+    context.result = calc_institutional_buy_ratio(df).iloc[0]
 
-@then('結果應為 {expected:f}')
+@then('投信買超佔比結果應為 {expected:f}')
 def step_impl(context, expected):
-    assert abs(context.ratio - expected) < 1e-4, f"預期 {expected}, 實際為 {context.ratio}"
+    assert abs(context.result - expected) < 1e-4, f"預期 {expected}, 實際 {context.result}"
 
-@given('過去 5 日投信完全沒有買賣紀錄')
+@given('系統目前的計算日為 {date}')
+def step_impl(context, date):
+    context.current_date = date
+
+@when('系統請求投信籌碼數據')
 def step_impl(context):
-    context.buy_vol = None # 模擬缺值
+    context.data_date = "2026-11-04" # 模擬系統 Point-in-Time 抓取時間
 
-@when('系統處理該檔股票的籌碼特徵')
+@then('系統只能取得 {expected_date} (含) 以前的盤後買賣超數據')
+def step_impl(context, expected_date):
+    assert context.data_date <= expected_date, "發生前視偏誤"
+
+@given('某檔股票在過去 5 個交易日完全無投信交易紀錄')
 def step_impl(context):
-    if context.buy_vol is None:
-        context.buy_vol = 0 # 缺值補0
+    context.inst_buy_5d = np.nan # 無紀錄視為 NaN
 
-@then('買超張數應填補為 0 而非 NaN')
+@then('投信買超張數應視為 0')
 def step_impl(context):
-    assert context.buy_vol == 0, "無交易紀錄必須補0"
-
+    df = pd.DataFrame({'inst_buy_5d': [context.inst_buy_5d], 'total_shares': [context.total_shares]})
+    context.filled_buy = df['inst_buy_5d'].fillna(0.0).iloc[0]
+    assert context.filled_buy == 0.0, "缺值必須補0"
 
 # ==========================================
 # US-578 單季毛利率年變動因子
 # ==========================================
-@given('某公司於 5月15日 公布 Q1 財報')
-def step_impl(context):
-    context.publish_date = "05-15"
-
-@when('系統在 5月14日 進行選股')
-def step_impl(context):
-    context.trade_date = "05-14"
-
-@then('系統不能使用該 Q1 的財報數據')
-def step_impl(context):
-    assert context.trade_date < context.publish_date, "未公布財報不可使用 (Point-in-Time 驗證)"
-
-@given('最新單季毛利率為 {margin_now:d}%')
+@given('某檔股票可取得的最新單季毛利率為 {margin_now:f}%')
 def step_impl(context, margin_now):
     context.margin_now = margin_now
 
-@given('去年同季毛利率為 {margin_last:d}%')
+@given('去年同季毛利率為 {margin_last:f}%')
 def step_impl(context, margin_last):
     context.margin_last = margin_last
 
 @when('系統計算毛利率年變動')
 def step_impl(context):
-    if getattr(context, 'margin_last', None) is None:
-        context.margin_diff = float('nan')
-    else:
-        context.margin_diff = context.margin_now - context.margin_last
+    df = pd.DataFrame({
+        'margin_now': [context.margin_now],
+        'margin_last': [getattr(context, 'margin_last', np.nan)]
+    })
+    context.result = calc_gross_margin_yoy(df).iloc[0]
 
-@then('結果差值應為 {expected:d}%')
+@then('毛利率差值結果應為 {expected:f}%')
 def step_impl(context, expected):
-    assert context.margin_diff == expected, f"預期 {expected}, 實際為 {context.margin_diff}"
+    assert abs(context.result - expected) < 1e-4, f"預期 {expected}, 實際 {context.result}"
 
-@given('該公司為新上市，無去年同期財報')
-def step_impl(context):
-    context.margin_now = 20
-    context.margin_last = None # 模擬無去年同期資料
+@given('某公司於 {publish_date} 公佈 Q1 財報')
+def step_impl(context, publish_date):
+    context.publish_date = publish_date
 
-@then('結果應標記為缺值 NaN 進入後續 Z-score 處理')
+@when('系統請求最新單季毛利率')
 def step_impl(context):
-    assert math.isnan(context.margin_diff), "無同期資料必須回傳 NaN"
+    context.requested_data_date = context.publish_date
+
+@then('系統不能取得 Q1 財報數據，必須使用前一季之數據')
+def step_impl(context):
+    assert context.current_date < context.requested_data_date, "未公布財報不可使用"
+
+@given('某檔股票為新上市櫃，無去年同季財報數據')
+def step_impl(context):
+    context.margin_last = np.nan
+
+@then('毛利率差值結果應標記為 NaN')
+def step_impl(context):
+    assert math.isnan(context.result), "無同期資料必須保留為 NaN 以供後續處理"

@@ -1,0 +1,12 @@
+# 金鑰與憑證
+.env
+*.pem
+# 有授權限制的資料與可重建的中間結果
+data/raw/
+data/processed/
+data/demo/
+output/
+# Python
+.venv/
+__pycache__/
+*.pyc

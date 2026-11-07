@@ -151,5 +151,5 @@ python src/create_report.py
 | 陳哲諺 | 協助需求文件整理與測試 |
 | 鄭稟哲 | （待補） |
 | 陳楓和 | MVP 主系統管線、Gherkin 測試、ADR、FinMind 資料來源 |
-| 王士哲 | （待補） |
+| 王士哲 | 檢查錯誤 |
 | 李承祐 | （待補） |
